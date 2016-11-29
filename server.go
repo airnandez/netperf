@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"strings"
@@ -58,15 +57,21 @@ func serverRun(cmdName string, config serverConfig) error {
 
 func handleConn(conn net.Conn) {
 	defer conn.Close()
-	start := time.Now()
 	received := uint64(0)
-	n, err := io.Copy(ioutil.Discard, conn)
-	elapsed := time.Since(start)
-	if err != nil {
-		errlog.Printf("%s\n", err)
-		return
+	buffer := make([]byte, 256*1024)
+	start := time.Now()
+	for {
+		n, err := conn.Read(buffer[:])
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			errlog.Printf("%s\n", err)
+			return
+		}
+		received += uint64(n)
 	}
-	received += uint64(n)
+	elapsed := time.Since(start)
 	rate := float64(received) / float64(MB) / elapsed.Seconds()
 	errlog.Printf("throughput: %.f MB/sec\n", rate)
 }

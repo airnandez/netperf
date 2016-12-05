@@ -18,9 +18,9 @@ const (
 func printUsage(f *os.File, kind usageType) {
 	const usageTempl = `
 USAGE:
-{{.Tab1}}{{.AppName}} server [-addr=<network address>]
+{{.Tab1}}{{.AppName}} server [options]
 
-{{.Tab1}}{{.AppName}} client [-server=<network address>]
+{{.Tab1}}{{.AppName}} client [options]
 
 {{.Tab1}}{{.AppName}} -help
 {{.Tab1}}{{.AppName}} -version

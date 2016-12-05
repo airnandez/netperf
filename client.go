@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"net"
@@ -32,6 +33,10 @@ func clientCmd() command {
 			clientUsage(args[0], os.Stderr)
 		}
 		fset.Parse(args[1:])
+		posArgs := fset.Args()
+		if len(posArgs) != 0 {
+			return fmt.Errorf("unexpected argument %q", posArgs[0])
+		}
 		return clientRun(args[0], config)
 	}
 	return command{fset: fset, run: run}
@@ -56,6 +61,9 @@ func clientRun(cmdName string, config clientConfig) error {
 
 	// Start workers
 	numWorkers := config.parallel
+	if numWorkers <= 0 {
+		numWorkers = 1
+	}
 	requests := make(chan *workerRequest, numWorkers)
 	var wg sync.WaitGroup
 	wg.Add(numWorkers)
@@ -65,8 +73,9 @@ func clientRun(cmdName string, config clientConfig) error {
 
 	// Establish connections to server, one per worker
 	conns := make([]net.Conn, numWorkers)
+	dial := getDialer(config.serverAddr)
 	for i := 0; i < numWorkers; i++ {
-		conn, err := net.Dial("tcp", config.serverAddr)
+		conn, err := dial()
 		if err != nil {
 			return err
 		}
@@ -101,11 +110,11 @@ func clientRun(cmdName string, config clientConfig) error {
 
 	// Collect summary report
 	report := <-summary
-	errlog.Printf("duration:               %s\n", report.duration)
-	errlog.Printf("streams:                %d\n", report.numWorkers)
-	errlog.Printf("data volume:            %.f MB\n", report.dataVolume)
-	errlog.Printf("aggregated throughput:  %.f MB/sec\n", report.aggregateThroughput)
-	errlog.Printf("per stream throughput:  %.f ± %.f MB/sec\n", report.avgStreamThroughput, report.stdStreamThroughput)
+	outlog.Printf("duration:               %s\n", report.duration)
+	outlog.Printf("streams:                %d\n", report.numWorkers)
+	outlog.Printf("data volume:            %.f MB\n", report.dataVolume)
+	outlog.Printf("aggregated throughput:  %.f MB/sec\n", report.aggregateThroughput)
+	outlog.Printf("per stream throughput:  %.f ± %.f MB/sec\n", report.avgStreamThroughput, report.stdStreamThroughput)
 	return nil
 }
 
@@ -200,35 +209,59 @@ func collectWorkerResponses(responses <-chan *workerResponse, summary chan<- sum
 	}
 }
 
+// getDialer returns a function to dial to the server
+// according to the format of the addr argument
+func getDialer(addr string) func() (net.Conn, error) {
+	const prefix = "tls://"
+	if !strings.HasPrefix(addr, prefix) {
+		return func() (net.Conn, error) {
+			return net.Dial("tcp", addr)
+		}
+	}
+	addr = strings.TrimPrefix(addr, prefix)
+	config := tls.Config{
+		InsecureSkipVerify: true,
+	}
+	return func() (net.Conn, error) {
+		return tls.Dial("tcp", addr, &config)
+	}
+}
+
 func clientUsage(cmd string, f *os.File) {
 	const template = `
 USAGE:
-{{.Tab1}}{{.AppName}} {{.SubCmd}} [-server=<network address>] [-duration=<duration>]
-{{.Tab1}}{{.AppNameFiller}} {{.SubCmdFiller}} [-len=<buffer length>]
+{{.Tab1}}{{.AppName}} {{.SubCmd}} [-duration <duration>] [-len <buffer length>]
+{{.Tab1}}{{.AppNameFiller}} {{.SubCmdFiller}} [-parallel <integer>] [-server <network address>]
 {{.Tab1}}{{.AppName}} {{.SubCmd}} -help
 
 DESCRIPTION:
 {{.Tab1}}'{{.AppName}} {{.SubCmd}}' establishes a network connection with the server
-{{.Tab1}}and exchanges data with it. It reports the observed network throughput
+{{.Tab1}}for sending data. It reports the observed network throughput
 {{.Tab1}}of that exchange.
 {{.Tab1}}For this command to work, a server must be already running. To start a
 {{.Tab1}}server uset the command '{{.AppName}} {{.ServerSubCmd}}'
 
 OPTIONS:
-{{.Tab1}}-server=<network address>
-{{.Tab2}}network address of the server. The form of the address is 'host:port'.
+{{.Tab1}}-server <network address>
+{{.Tab2}}network address of the server. The form of the address is 'host:port'
+{{.Tab2}}if the server waits for a TCP connection, or 'tls://host:port'
+{{.Tab2}}if the server waits for a TLS connection.
 {{.Tab2}}Default: '{{.DefaultServerAddr}}'
 
-{{.Tab1}}-duration=<duration>
+{{.Tab1}}-duration <duration>
 {{.Tab2}}amount of time of the data exchange. Examples of valid values
 {{.Tab2}}for this option are '60s', '1h30m', '120s', '2h', etc.
 {{.Tab2}}Default: '{{.DefaultDuration}}'
 
-{{.Tab1}}-len=<buffer length>
-{{.Tab2}}size in bytes of the buffer used for exchanging data with the server.
+{{.Tab1}}-len <buffer length>
+{{.Tab2}}size in bytes of the buffer used for sending data to the server.
 {{.Tab2}}Examples of valid values for this option are: '4096', '128K', '512KB',
 {{.Tab2}}'1MB'.
 {{.Tab2}}Default: '{{.DefaultBufferSize}}'
+
+{{.Tab1}}-parallel <integer>
+{{.Tab2}}number of simultaneous network connections to establish with the server.
+{{.Tab2}}Default: {{.DefaultParallel}}
 
 {{.Tab1}}-help
 {{.Tab2}}print this help
@@ -239,5 +272,6 @@ OPTIONS:
 	tmplFields["ServerSubCmd"] = serverSubCmd
 	tmplFields["DefaultDuration"] = defaultDuration.String()
 	tmplFields["DefaultBufferSize"] = defaultBufferSize
+	tmplFields["DefaultParallel"] = fmt.Sprintf("%d", defaultParallel)
 	render(template, tmplFields, f)
 }

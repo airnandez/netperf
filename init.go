@@ -20,8 +20,9 @@ var (
 	// application build time stamp: set at build time
 	appBuildTime = "unknown"
 
-	// application error logger
+	// application output and error logger
 	errlog *log.Logger
+	outlog *log.Logger
 
 	// fields used in the help templates
 	tmplFields = map[string]string{
@@ -48,9 +49,12 @@ var (
 )
 
 const (
-	defaultServerAddr string        = ":9876"
 	serverSubCmd      string        = "server"
 	clientSubCmd      string        = "client"
+	defaultServerAddr string        = ":9876"
+	defaultServerCA   string        = "ca.pem"
+	defaultServerCert string        = "cert.pem"
+	defaultServerKey  string        = "key.pem"
 	defaultDuration   time.Duration = time.Duration(30) * time.Second
 	defaultParallel   int           = 1
 	defaultBufferSize string        = "128KB"
@@ -59,6 +63,7 @@ const (
 func init() {
 	appName = filepath.Base(os.Args[0])
 	errlog = log.New(os.Stderr, fmt.Sprintf("%s: ", appName), 0)
+	outlog = log.New(os.Stdout, fmt.Sprintf("%s: ", appName), 0)
 	tmplFields["AppName"] = appName
 	tmplFields["AppNameFiller"] = strings.Repeat(" ", len(appName))
 	return

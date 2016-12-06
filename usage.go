@@ -19,7 +19,6 @@ func printUsage(f *os.File, kind usageType) {
 	const usageTempl = `
 USAGE:
 {{.Tab1}}{{.AppName}} server [options]
-
 {{.Tab1}}{{.AppName}} client [options]
 
 {{.Tab1}}{{.AppName}} -help

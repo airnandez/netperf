@@ -29,12 +29,12 @@ func main() {
 	}
 
 	commands := map[string]command{
-		serverSubCmd: serverCmd(),
-		clientSubCmd: clientCmd(),
+		receiveSubCmd: receiverCmd(),
+		sendSubCmd:    senderCmd(),
 	}
 	cmd, ok := commands[args[0]]
 	if !ok {
-		errlog.Printf("'%s' is not an accepted command\n", args[0])
+		errlog.Printf("%q is not a valid command\n", args[0])
 		fset.Usage()
 		os.Exit(1)
 	}

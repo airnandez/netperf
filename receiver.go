@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-type serverConfig struct {
+type receiverConfig struct {
 	// Command line options
 	help bool
 	addr string
@@ -22,37 +22,34 @@ type serverConfig struct {
 	key  string
 }
 
-func serverCmd() command {
-	fset := flag.NewFlagSet("netperf server", flag.ExitOnError)
-	config := serverConfig{}
+func receiverCmd() command {
+	fset := flag.NewFlagSet("netperf receive", flag.ExitOnError)
+	config := receiverConfig{}
 	fset.BoolVar(&config.help, "help", false, "")
-	fset.StringVar(&config.addr, "addr", defaultServerAddr, "")
-	fset.StringVar(&config.ca, "ca", defaultServerCA, "")
-	fset.StringVar(&config.cert, "cert", defaultServerCert, "")
-	fset.StringVar(&config.key, "key", defaultServerKey, "")
+	fset.StringVar(&config.addr, "addr", defaultReceiverAddr, "")
+	fset.StringVar(&config.ca, "ca", defaultReceiverCA, "")
+	fset.StringVar(&config.cert, "cert", defaultReceiverCert, "")
+	fset.StringVar(&config.key, "key", defaultReceiverKey, "")
 	run := func(args []string) error {
 		fset.Usage = func() {
-			serverUsage(args[0], os.Stderr)
+			receiverUsage(args[0], os.Stderr)
 		}
 		fset.Parse(args[1:])
 		posArgs := fset.Args()
 		if len(posArgs) != 0 {
 			return fmt.Errorf("unexpected argument %q", posArgs[0])
 		}
-		return serverRun(args[0], config)
+		return receiverRun(args[0], config)
 	}
 	return command{fset: fset, run: run}
 }
 
-func serverRun(cmdName string, config serverConfig) error {
+func receiverRun(cmdName string, config receiverConfig) error {
 	if config.help {
-		serverUsage(cmdName, os.Stderr)
+		receiverUsage(cmdName, os.Stderr)
 		return nil
 	}
 	errlog = setErrlog(cmdName)
-	debug(1, "running server with:")
-	debug(1, "   addr='%s'\n", config.addr)
-
 	listener, err := listen(config)
 	if err != nil {
 		return err
@@ -64,19 +61,19 @@ func serverRun(cmdName string, config serverConfig) error {
 			errlog.Printf("%s\n", err)
 			continue
 		}
-		go handleConn(conn)
+		go receiveData(conn)
 	}
 	return nil
 }
 
-func listen(config serverConfig) (net.Listener, error) {
+func listen(config receiverConfig) (net.Listener, error) {
 	const prefix = "tls://"
 	if !strings.HasPrefix(config.addr, prefix) {
 		return net.Listen("tcp", config.addr)
 	}
 	pool, err := loadCaCerts(config.ca)
 	if err != nil {
-		return nil, fmt.Errorf("error loading CA certificate from fie %q: %s", config.ca, err)
+		return nil, fmt.Errorf("error loading CA certificate from file %q: %s", config.ca, err)
 	}
 	serverCert, err := tls.LoadX509KeyPair(config.cert, config.key)
 	if err != nil {
@@ -97,16 +94,16 @@ func loadCaCerts(path string) (*x509.CertPool, error) {
 	}
 	caCerts, err := ioutil.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("error loading CA certficates from '%s': %s", path, err)
+		return nil, err
 	}
 	pool := x509.NewCertPool()
 	if !pool.AppendCertsFromPEM(caCerts) {
-		return nil, fmt.Errorf("error creating pool of CA certficates: %s", err)
+		return nil, err
 	}
 	return pool, nil
 }
 
-func handleConn(conn net.Conn) {
+func receiveData(conn net.Conn) {
 	defer conn.Close()
 	received := uint64(0)
 	buffer := make([]byte, 256*1024)
@@ -124,10 +121,10 @@ func handleConn(conn net.Conn) {
 	}
 	elapsed := time.Since(start)
 	rate := float64(received) / float64(MB) / elapsed.Seconds()
-	errlog.Printf("throughput: %.f MB/sec\n", rate)
+	errlog.Printf("throughput: %.2f MiB/sec\n", rate)
 }
 
-func serverUsage(cmd string, f *os.File) {
+func receiverUsage(cmd string, f *os.File) {
 	const template = `
 USAGE:
 {{.Tab1}}{{.AppName}} {{.SubCmd}} [-ca <file>] [-cert <file>] [-key <file>]
@@ -135,45 +132,45 @@ USAGE:
 {{.Tab1}}{{.AppName}} {{.SubCmd}} -help
 
 DESCRIPTION:
-{{.Tab1}}'{{.AppName}} {{.SubCmd}}' starts a server which waits for incoming
-{{.Tab1}}network connections from clients and starts receiving data from them.
+{{.Tab1}}'{{.AppName}} {{.SubCmd}}' starts a receiver which waits for incoming
+{{.Tab1}}network connections from senders, receives and discards data from them.
 {{.Tab1}}It reports on the network thoughput observed while receiving the data.
 
 OPTIONS:
 {{.Tab1}}-addr <network address>
-{{.Tab2}}specifies the network address this server listens to for incoming
+{{.Tab2}}specifies the network address this receiver listens to for incoming
 {{.Tab2}}connections. The form of this address is 'interface:port' or
 {{.Tab2}}'tls://interface:port'. Examples of valid adresses are '127.0.0.1:9876'
 {{.Tab2}}'tls://127.0.0.1:9876'.
 {{.Tab2}}Use a network address starting by 'tls://' to instruct the server to
-{{.Tab2}}use TLS to encrypt the communication channel with its clients.
-{{.Tab2}}Default: '{{.DefaultServerAddr}}'
+{{.Tab2}}use TLS to encrypt the communication channel with senders.
+{{.Tab2}}Default: '{{.DefaultReceiverAddr}}'
 
 {{.Tab1}}-cert <file>
 {{.Tab2}}specifies the path of the PEM-formatted file of the certificate
-{{.Tab2}}this server presents to its clients, when using TLS connections.
-{{.Tab2}}Default: '{{.DefaultServerCert}}'
+{{.Tab2}}this receiver presents to its clients when using TLS connections.
+{{.Tab2}}Default: '{{.DefaultReceiverCert}}'
 
 {{.Tab1}}-key <file>
 {{.Tab2}}specifies the path of the PEM-formatted file of the private key
-{{.Tab2}}this server uses to encrypt the communication channel with its
+{{.Tab2}}this receiver uses to encrypt the communication channel with its
 {{.Tab2}}clients, when using TLS.
-{{.Tab2}}Default: '{{.DefaultServerKey}}'
+{{.Tab2}}Default: '{{.DefaultReceiverKey}}'
 
 {{.Tab1}}-ca <file>
 {{.Tab2}}specifies the path of the PEM-formatted file of CA certificates.
 {{.Tab2}}This server accepts client certificates issued by any of those CAs.
 {{.Tab2}}This option is only relevant when using TLS.
-{{.Tab2}}Default: '{{.DefaultServerCA}}'
+{{.Tab2}}Default: '{{.DefaultReceiverCA}}'
 
 {{.Tab1}}-help
 {{.Tab2}}print this help
 `
 	tmplFields["SubCmd"] = cmd
 	tmplFields["SubCmdFiller"] = strings.Repeat(" ", len(cmd))
-	tmplFields["DefaultServerAddr"] = defaultServerAddr
-	tmplFields["DefaultServerCert"] = defaultServerCert
-	tmplFields["DefaultServerKey"] = defaultServerKey
-	tmplFields["DefaultServerCA"] = defaultServerCA
+	tmplFields["DefaultReceiverAddr"] = defaultReceiverAddr
+	tmplFields["DefaultReceiverCert"] = defaultReceiverCert
+	tmplFields["DefaultReceiverKey"] = defaultReceiverKey
+	tmplFields["DefaultReceiverCA"] = defaultReceiverCA
 	render(template, tmplFields, f)
 }

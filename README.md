@@ -8,21 +8,21 @@ It is intended to understand the penalty (if any) of developing data transfer to
 It consists of a client and a server. The server listens for network connections from clients (current only TCP and TLS are implemented). The client connects to the server and sends data during a specified period of time, using one or more network streams. After the data exchange period is finished, both the client and the server report on the observed throughput.
 
 ## How to use
-First, start a server for listening for TCP connections:
+First, start a receiver for receiving data over TCP connections:
 
 ```bash
-$ netperf server -addr :5000
+$ netperf receive -addr :5678
 ```
 
-Then, start a client for sending data to the server launched in the previous step, during one minute, using 10 TCP streams:
+Then, start a client for sending data to the server launched in the previous step, during one minute, using 2 TCP streams:
 
 ```bash
-$ netperf client -server host.example.org:5000 -duration 1m -parallel 10
-netperf: duration:               1m0.000766133s
-netperf: streams:                10
-netperf: data volume:            277127 MB
-netperf: aggregated throughput:  4619 MB/sec
-netperf: per stream throughput:  462 ± 0 MB/sec
+$ netperf send -addr localhost:5678 -duration 1m -parallel 2
+netperf: duration:                       1m0.000074495s
+netperf: streams:                        2
+netperf: data volume:                    299048.88 MiB
+netperf: aggregated throughput:          4984.14 MiB/sec
+netperf: avg/std throughput per stream:  2492.07 / 53.90 MiB/sec
 ```
 
 This is the synopsis of the command:
@@ -30,17 +30,16 @@ This is the synopsis of the command:
 ```
 $ netperf
 USAGE:
-    netperf server [options]
-    netperf client [options]
+    netperf receive [options]
+    netperf send [options]
 
     netperf -help
     netperf -version
 
-Use 'netperf -help' to get detailed information about options and examples
-of usage.
+Use 'netperf -help' to get more detailed usage information.
 ```
 
-For getting details on available options do `netperf server -help` or `netperf client -help`.
+For getting details on available options for each subcommand do `netperf send -help` or `netperf receive -help`.
 
 ## Installation
 To **build from sources**, you need the [Go programming environment](https://golang.org). Do:

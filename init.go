@@ -49,15 +49,15 @@ var (
 )
 
 const (
-	serverSubCmd      string        = "server"
-	clientSubCmd      string        = "client"
-	defaultServerAddr string        = ":9876"
-	defaultServerCA   string        = "ca.pem"
-	defaultServerCert string        = "cert.pem"
-	defaultServerKey  string        = "key.pem"
-	defaultDuration   time.Duration = time.Duration(30) * time.Second
-	defaultParallel   int           = 1
-	defaultBufferSize string        = "128KB"
+	receiveSubCmd       string        = "receive"
+	sendSubCmd          string        = "send"
+	defaultReceiverAddr string        = ":9876"
+	defaultReceiverCA   string        = "ca.pem"
+	defaultReceiverCert string        = "cert.pem"
+	defaultReceiverKey  string        = "key.pem"
+	defaultDuration     time.Duration = time.Duration(30) * time.Second
+	defaultParallel     int           = 1
+	defaultBufferSize   string        = "128KB"
 )
 
 func init() {

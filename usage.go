@@ -3,7 +3,6 @@ package main
 import (
 	"io"
 	"os"
-	"strings"
 	"text/tabwriter"
 	"text/template"
 )
@@ -18,18 +17,17 @@ const (
 func printUsage(f *os.File, kind usageType) {
 	const usageTempl = `
 USAGE:
-{{.Tab1}}{{.AppName}} server [options]
-{{.Tab1}}{{.AppName}} client [options]
+{{.Tab1}}{{.AppName}} {{.ReceiveCmd}} [options]
+{{.Tab1}}{{.AppName}} {{.SendCmd}} [options]
 
 {{.Tab1}}{{.AppName}} -help
 {{.Tab1}}{{.AppName}} -version
 {{if eq .UsageVersion "short"}}
-Use '{{.AppName}} -help' to get detailed information about options and examples
-of usage.{{else}}
+Use '{{.AppName}} -help' to get more detailed usage information.{{else}}
 
 DESCRIPTION:
-{{.Tab1}}{{.AppName}} is a basic tool to measure the network throughput that
-{{.Tab1}}can be obtained by a Go application.
+{{.Tab1}}{{.AppName}} is a simple tool to measure throughput that can be obtained
+{{.Tab1}}by a minimal Go application when transferring data over the network.
 
 OPTIONS:
 {{.Tab1}}-help
@@ -39,27 +37,28 @@ OPTIONS:
 {{.Tab2}}Show detailed version information about this application
 
 SUBCOMMANDS:
-{{.Tab1}}server
-{{.Tab2}}use this subcommand to start a server. A server waits for network
-{{.Tab2}}connections from a client and measures the thoughput of data
-{{.Tab2}}exchanged between client and server.
+{{.Tab1}}{{.ReceiveCmd}}
+{{.Tab2}}use this subcommand to start a data receiver. A receiver waits
+{{.Tab2}}for network connections from a sender, receives the data sent
+{{.Tab2}}by it and reports on the observed throughput.
 
-{{.Tab2}}Use '{{.AppName}} server -help' for getting detailed help on this
+{{.Tab2}}Use '{{.AppName}} {{.ReceiveCmd}} -help' for getting detailed help on this
 {{.Tab2}}subcommand.
 
-{{.Tab1}}client
-{{.Tab2}}use this subcommand to connect to a server and start a data exchange
-{{.Tab2}}with it and report on the observed throughtput.
+{{.Tab1}}{{.SendCmd}}
+{{.Tab2}}use this subcommand to establish a connection with a receiver,
+{{.Tab2}}send data to it for a specified period of time and report on the
+{{.Tab2}}observed throughtput.
 
-{{.Tab2}}Use '{{.AppName}} client -help' for getting detailed help on this
+{{.Tab2}}Use '{{.AppName}} {{.SendCmd}} -help' for getting detailed help on this
 {{.Tab2}}subcommand.
 {{end}}
 `
-	tmplFields["ClientCmdFiller"] = strings.Repeat(" ", len("client"))
-	tmplFields["ServerCmdFiller"] = strings.Repeat(" ", len("server"))
 	if kind == usageLong {
 		tmplFields["UsageVersion"] = "long"
 	}
+	tmplFields["ReceiveCmd"] = receiveSubCmd
+	tmplFields["SendCmd"] = sendSubCmd
 	render(usageTempl, tmplFields, f)
 }
 

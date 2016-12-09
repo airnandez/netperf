@@ -216,9 +216,12 @@ func collectWorkerResponses(responses <-chan *workerResponse, summary chan<- sum
 // addr can be of the form: 'host:port' or 'tls://host:port'.
 func getDialer(addr string) func() (net.Conn, error) {
 	const prefix = "tls://"
+	d := &net.Dialer{
+		Timeout: 5 * time.Second,
+	}
 	if !strings.HasPrefix(addr, prefix) {
 		return func() (net.Conn, error) {
-			return net.Dial("tcp", addr)
+			return d.Dial("tcp", addr)
 		}
 	}
 	addr = strings.TrimPrefix(addr, prefix)
@@ -226,7 +229,7 @@ func getDialer(addr string) func() (net.Conn, error) {
 		InsecureSkipVerify: true,
 	}
 	return func() (net.Conn, error) {
-		return tls.Dial("tcp", addr, &config)
+		return tls.DialWithDialer(d, "tcp", addr, &config)
 	}
 }
 

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pkg/profile"
 )
 
 type senderConfig struct {
@@ -18,6 +20,7 @@ type senderConfig struct {
 	duration   time.Duration
 	parallel   int
 	bufferSize string
+	profile    bool
 }
 
 func senderCmd() command {
@@ -28,6 +31,7 @@ func senderCmd() command {
 	fset.DurationVar(&config.duration, "duration", defaultDuration, "")
 	fset.IntVar(&config.parallel, "parallel", defaultParallel, "")
 	fset.StringVar(&config.bufferSize, "len", defaultBufferSize, "")
+	fset.BoolVar(&config.profile, "prof", false, "")
 	run := func(args []string) error {
 		fset.Usage = func() {
 			senderUsage(args[0], os.Stderr)
@@ -51,6 +55,11 @@ func senderRun(cmdName string, config senderConfig) error {
 	bufsize, err := parseBufferLength(config.bufferSize)
 	if err != nil {
 		return fmt.Errorf("invalid buffer size value %q", config.bufferSize)
+	}
+
+	// Activate profiling
+	if config.profile {
+		defer profile.Start(profile.ProfilePath("./pprof")).Stop()
 	}
 
 	// Start workers

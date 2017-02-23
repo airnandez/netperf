@@ -11,15 +11,18 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/pkg/profile"
 )
 
 type receiverConfig struct {
 	// Command line options
-	help bool
-	addr string
-	ca   string
-	cert string
-	key  string
+	help    bool
+	addr    string
+	ca      string
+	cert    string
+	key     string
+	profile bool
 }
 
 func receiverCmd() command {
@@ -30,6 +33,7 @@ func receiverCmd() command {
 	fset.StringVar(&config.ca, "ca", defaultReceiverCA, "")
 	fset.StringVar(&config.cert, "cert", defaultReceiverCert, "")
 	fset.StringVar(&config.key, "key", defaultReceiverKey, "")
+	fset.BoolVar(&config.profile, "prof", false, "")
 	run := func(args []string) error {
 		fset.Usage = func() {
 			receiverUsage(args[0], os.Stderr)
@@ -53,6 +57,11 @@ func receiverRun(cmdName string, config receiverConfig) error {
 	listener, err := listen(config)
 	if err != nil {
 		return err
+	}
+
+	// Activate profiling
+	if config.profile {
+		defer profile.Start(profile.ProfilePath("./pprof")).Stop()
 	}
 
 	for {

@@ -110,6 +110,7 @@ func receiveData(conn net.Conn) {
 	start := time.Now()
 	for {
 		n, err := conn.Read(buffer[:])
+		received += uint64(n)
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -117,7 +118,6 @@ func receiveData(conn net.Conn) {
 			errlog.Printf("%s\n", err)
 			return
 		}
-		received += uint64(n)
 	}
 	elapsed := time.Since(start)
 	rate := float64(received) / float64(MB) / elapsed.Seconds()
